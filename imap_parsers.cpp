@@ -71,7 +71,17 @@ QString imap::decodeMimeWord(const QString& in)
 {
     //Z wikipedii, hasło:MIME
     if(in[0] != '=')return in;
-
+    //Gmail wysyła wieloczęściowe tematy oddzielone spacją
+    if(in.contains(' '))
+    {
+        auto strList = in.split(' ');
+        QString ret;
+        for(auto& s: strList)
+        {
+            ret += decodeMimeWord(s);
+        }
+        return ret;
+    }
     auto parts = in.split('?');
 
     auto format = parts[1];

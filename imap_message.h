@@ -57,7 +57,6 @@ namespace imap{
         s << tag << cmd.data();
         (s << ... <<args);
         return s.join(' ').toUtf8().trimmed()+"\r\n"; //tag command [args...]\r\n
-        tagCount++;
     }
 }
 #endif // IMAPCOMMAND_H
