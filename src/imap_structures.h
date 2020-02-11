@@ -43,6 +43,11 @@ namespace imap
         QDateTime date() const;
 
     };
+    struct MailEntry
+    {
+        QString uid;
+        Envelope details;
+    };
 }
 
 

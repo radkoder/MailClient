@@ -19,12 +19,18 @@ MainWindow::MainWindow(QWidget *parent)
         mailBox.open(ldiag.loginData.server);
         mailBox.login(ldiag.loginData.mail,ldiag.loginData.pass);
         mailBox.select("INBOX");
-        mailBox.fetchLatest(10);
+        mailBox.fetchInfo(20);
     }else
     {
         dconsole->write("nie zalogowany");
     }
     dconsole->show();
+    ui->mailListView->setModel(&mailModel);
+    ui->mailListView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    mailBox.onFetchReady([this]()
+    {
+       mailModel.setMails(mailBox.getLatest(10));
+    });
 
 }
 
@@ -32,4 +38,5 @@ MainWindow::~MainWindow()
 {
     delete ui;
 }
+
 

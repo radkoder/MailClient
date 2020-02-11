@@ -1,5 +1,6 @@
 #include "imap_mailbox.h"
 #include "imap_parsers.h"
+#include <QtAlgorithms>
 imap::MailBox::MailBox(QObject *parent) : QObject(parent)
 {
     connect(&conn,&Connection::log,[&](QString s){
@@ -55,23 +56,33 @@ void imap::MailBox::select(QString folderName)
 
 }
 
-void imap::MailBox::fetchLatest(int num)
+void imap::MailBox::fetchInfo(int num, int skip)
 {
     if(!safeState)
     {
         emit log("fetch waiting");
-        callQueue.push_back([num,this](){
-           fetchLatest(num);
+        callQueue.push_back([num,skip,this](){
+           fetchInfo(num,skip);
         });
     }
     else
     {
         contextQueue.push_back({Command::fetch,Request::fetch_envelope});
-        auto start = QString::number(mailNum);
-        auto end = QString::number(mailNum - num);
+        auto start = QString::number(mailNum - skip) ;
+        auto end = QString::number(mailNum - skip - num);
         auto range = start+':'+end;
-        conn.send(makeRequest(Command::fetch,range,"ENVELOPE"));
+        conn.send(makeRequest(Command::fetch,range,"(ENVELOPE","UID)"));
     }
+}
+
+QVector<imap::MailEntry> imap::MailBox::getLatest(int num)
+{
+    std::partial_sort(mails.begin(),mails.begin()+num,mails.end(),[](auto a,auto b){
+        return a.details.date() > b.details.date();
+    });
+    QVector<MailEntry> ret;
+    std::copy_n(mails.begin(),num,std::back_inserter(ret));
+    return ret;
 }
 void imap::MailBox::getResponse(QStringList responseBatch)
 {
@@ -116,30 +127,45 @@ void imap::MailBox::getResponse(QStringList responseBatch)
         if(ctx.req == Request::fetch_envelope)
         {
             //parsujemy strukture "envelope"
-            auto envs = responseBatch.filter("ENVELOPE");
-            for(const auto& line : envs)
+            auto envelopes = responseBatch.filter("ENVELOPE");
+            for(const auto& line : envelopes)
             {
-                auto l = parseLine(line);
-                auto lf = l.filter("ENVELOPE");
-                auto pl = parseList(lf[0]);
-                auto env = pl[1];
-                //auto env = parseList(parseLine(line).filter("ENVELOPE")[0])[1];
-                Envelope e(env);
-                emit log("Got mail: "+e.from.handle+"@"+e.from.domain+" - "+e.subject);
+                //taki ciąg zmiennych dla ułatwienia debugowania
+                //bo to jedna z najbardziej bugogennych sekcji
+                auto line_parts         = parseLine(line);
+                auto line_response_data = line_parts.filter("ENVELOPE").first();
+                auto response_list      = parseList(line_response_data);
+                auto env_struct         = getFromList(response_list,"ENVELOPE");
+                auto uid_val            = getFromList(response_list,"UID");
+                MailEntry entry{uid_val,env_struct};
+
+                emit log("Got mail: ("+entry.uid+") "+entry.details.from.mailAddress()+" - "+entry.details.subject);
+                addMail(entry);
             }
+            emit fetchReady();
         }
         //BIG BOI INC parsowanie maila
     }
 
     //kiedy stan jest bezpieczny a są jeszcze zakolejkowane wywołania
     //wtedy wywołaj wszystkie w kolejności
-    //((może lepiej to by było zrobić w sygnałach??))
     if(safeState && !callQueue.empty())
     {
         while(!callQueue.empty())
         {
             std::invoke(callQueue.takeFirst());
         }
+    }
+
+}
+
+void imap::MailBox::addMail(imap::MailEntry newEntry)
+{
+    auto uid = newEntry.uid.toInt();
+    if(!uids.contains(uid))
+    {
+        uids.insert(uid);
+        mails.push_back(newEntry);
     }
 
 }

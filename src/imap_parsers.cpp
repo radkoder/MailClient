@@ -111,3 +111,10 @@ QString imap::decodeMimeWord(const QString& in)
 
 
 }
+
+QString imap::getFromList(const QStringList &list,const QString& name)
+{
+    //wg specyfikacji
+    //wartość pola następuje bezpośrednio po nazwie pola
+    return list.at( list.indexOf(name) + 1 );
+}
