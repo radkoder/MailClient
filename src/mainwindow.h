@@ -24,5 +24,6 @@ private:
     imap::MailBox mailBox;
     DebugConsole* dconsole;
     MailListModel mailModel;
+    int pageNum=0;
 };
 #endif // MAINWINDOW_H

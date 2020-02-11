@@ -11,7 +11,20 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(&mailBox,&imap::MailBox::log,dconsole,&DebugConsole::write);
     connect(&mailBox,&imap::MailBox::error,dconsole,&DebugConsole::writeUrgent);
+    connect(ui->nextButton,&QPushButton::clicked,[this](bool c){
+        pageNum++;
+        mailBox.fetchInfo(10,10*pageNum);
+        mailBox.onFetchReady([this]()
+        {
+           mailModel.setMails(mailBox.getLatest(10,10*pageNum));
+        });
 
+    });
+    connect(ui->prevButton,&QPushButton::clicked,[this](bool c){
+        pageNum--;
+        if(pageNum<0)pageNum=0;
+        mailModel.setMails(mailBox.getLatest(10,10*pageNum));
+    });
     //get credentials
     LoginDialog ldiag;
     if(ldiag.exec() == QDialog::Accepted)

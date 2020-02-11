@@ -64,7 +64,7 @@ QStringList imap::parseDoubleList(const QString& str)
 bool imap::isTagged(const QByteArray& in)
 {
    auto str = QString::fromUtf8(in);
-   QRegularExpression r("^\\d{4} \\w");
+   QRegularExpression r("^[0-9a-f]{4} \\w");
    return r.match(str).hasMatch();
 }
 QString imap::decodeMimeWord(const QString& in)

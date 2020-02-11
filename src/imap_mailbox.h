@@ -34,7 +34,7 @@ namespace imap
         void send(Command arglessCmd);
         void select(QString folderName);
         void fetchInfo(int num,int skip = 0);
-        QVector<MailEntry> getLatest(int num);
+        QVector<MailEntry> getLatest(int num,int skip=0);
         template<typename Func>
         void onFetchReady(Func f);
     signals:

@@ -75,13 +75,13 @@ void imap::MailBox::fetchInfo(int num, int skip)
     }
 }
 
-QVector<imap::MailEntry> imap::MailBox::getLatest(int num)
+QVector<imap::MailEntry> imap::MailBox::getLatest(int num,int skip)
 {
-    std::partial_sort(mails.begin(),mails.begin()+num,mails.end(),[](auto a,auto b){
+    std::partial_sort(mails.begin(),mails.begin()+num+skip,mails.end(),[](auto a,auto b){
         return a.details.date() > b.details.date();
     });
     QVector<MailEntry> ret;
-    std::copy_n(mails.begin(),num,std::back_inserter(ret));
+    std::copy_n(mails.begin()+skip,num,std::back_inserter(ret));
     return ret;
 }
 void imap::MailBox::getResponse(QStringList responseBatch)
