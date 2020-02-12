@@ -1,13 +1,49 @@
 #include "imap_parsers.h"
 #include <QRegularExpression>
+QString parseLiteral(const QChar** pptr)
+{
+    //Parsowanie dosłownego stringa wg sekcji 4.3 dokumentacji IMAPv4
+    auto ptr = *pptr;
+    int num=0;
+    QString buff;
+    while(num==0)
+    {
+        //Odczytanie liczby oktetów stringa
+        switch (ptr->unicode())
+        {
+        case '{':
+            ptr++;
+            break;
+        case '0' ... '9':
+            buff+=*ptr;
+            break;
+        case '}':
+            num = buff.toInt();
+            ptr++;
+            break;
+        }
+    }
+    buff.clear();
+    buff.reserve(num);
+    ptr+=2; //właściwy tekst jest oddzielony od liczby oktetów [CR][LF]
+    for(int i=0;i<num;i++)
+    {
+        buff+=*ptr;
+        ptr++;
+    }
+    return buff;
+
+
+}
 QStringList imap::parseLine(const QString& string)
 {
     const QChar *ptr = string.data();
     int paren = 0;  //licznik zagnieżdżenia nawiasów
-    bool str = false; //czy jesteśmy w "stringu"
+    bool quotes = false; //czy jesteśmy w "stringu"
+
     QString buff;
     QStringList out; //tablica tokenów
-    while(*ptr != '\0' && *ptr != '\n')
+    while(*ptr != '\0')
     {
         switch(ptr->unicode())
         {
@@ -21,7 +57,7 @@ QStringList imap::parseLine(const QString& string)
             buff+=*ptr;
             break;
         case ' ':
-            if(paren == 0 && !str){ //jeżeli jesteśmy w nawiasach albo w "" to nie rozdzielamy
+            if(paren == 0 && !quotes){ //jeżeli jesteśmy w nawiasach albo w "" to nie rozdzielamy
                 out.push_back(buff);
                 buff.clear();
             }
@@ -29,7 +65,10 @@ QStringList imap::parseLine(const QString& string)
             break;
         case '\"':
             if(paren > 0)buff+=*ptr; //jeżeli jesteśmy w nawiasach i natrafimy na "" to nie pomijamy go tylko kopiujemy jak leci
-            else str = !str; //jeżlei jesteśmy poza to pomijamy "" i kopiujemy tylko zawartość stringa
+            else quotes = !quotes; //jeżlei jesteśmy poza to pomijamy "" i kopiujemy tylko zawartość stringa
+            break;
+        case '{':
+            buff+=parseLiteral(&ptr); //pomocnicza funkcja żeby już nie mieszać kodu
             break;
         default:
             buff+=*ptr;
@@ -51,7 +90,6 @@ QStringList imap::parseList(const QString& str)
     }
     else
     {
-        /*error*/
         return QStringList();
     }
 }
