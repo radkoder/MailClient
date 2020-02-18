@@ -3,50 +3,63 @@
 
 #include <QObject>
 #include <QSet>
+#include <QMap>
 #include "imap_connection.h"
 #include "imap_message.h"
 #include "imap_structures.h"
 
+#include <future>
 #include <functional> //OH NONONONO
-
+#include <QThread>
 namespace imap
 {
-    /*Nie wiedzalem jak lepiej nazwać*/
-    enum class Request
-    {
-        none,
-        fetch_envelope,
-        fetch_body
-    };
-    struct Context
+    struct ResponseEntry
     {
         Command cmd;
-        Request req;
-        Context(Command c,Request r=Request::none);
+        Context ctx;
+        std::future<Message> future;
     };
+    struct ResponseHandle
+    {
+        Message get();
+        ResponseHandle &onReady(std::function<void(Message)> func);
+        ResponseHandle(int index,MailBox* owner);
+    private:
+        int myIndex;
+        MailBox* myBox;
+    };
+
     class MailBox : public QObject
     {
         Q_OBJECT
     public:
         explicit MailBox(QObject *parent = nullptr);
         void open(QString hostname);
-        void login(QString username, QString password);
-        void send(Command arglessCmd);
-        void select(QString folderName);
-        void fetchInfo(int num,int skip = 0);
+        ResponseHandle login(QString username, QString password);
+        ResponseHandle send(Command arglessCmd);
+        ResponseHandle select(QString folderName);
+        ResponseHandle fetchInfo(int num,int skip = 0);
+        ResponseHandle fetchBody(QString uid);
         QVector<MailEntry> getLatest(int num,int skip=0);
+        QString getBody(QString uid);
+
+        Message get(int index);
+        void putCallback(int index,std::function<void(Message)> func);
         template<typename Func>
         void onFetchReady(Func f);
+        ~MailBox();
     signals:
         void log(QString);
         void error(QString);
         void loggedIn(Account);
         void syntaxError();
         void fetchReady();
+        void sendRequest(Request);
+        void openConn(QString hostname);
     private:
-        void getResponse(QStringList responseBatch);
+        void getResponse(int index);
         void addMail(MailEntry newEntry);
-        Connection conn;
+        Connection* conn;
 
         QList<Context> contextQueue;
         QList<std::function<void(void)>> callQueue; //this kills the cpplet xd
@@ -56,13 +69,25 @@ namespace imap
         Account logged_in;
 
         QVector<MailEntry> mails;
+        QMap<int,QString> mailBodies;
         QSet<int> uids;
+
+        /*newstuff*/
+        std::unordered_map<int, ResponseEntry> futures;
+        QMap<int, Message> responses;
+        QMap<int,std::function<void(Message)>> callbacks;
+        QThread netThread;
+
+        int keycount=0;
 
     };
 
     template<typename Func>
     void MailBox::onFetchReady(Func f)
     {
+        /*TODO*/
+        //trzeba będzie zastąpić kolejką wywołań
+        //bo buguje się kiedy jest więcej niż 1 f()
         QMetaObject::Connection * const connection = new QMetaObject::Connection;
         *connection = connect(this, &MailBox::fetchReady, [this, f, connection](){
             f();

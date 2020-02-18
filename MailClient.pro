@@ -41,6 +41,7 @@ HEADERS += \
 FORMS += \
     src/debugconsole.ui \
     src/logindialog.ui \
+    src/mailbodyview.ui \
     src/mainwindow.ui
 
 # Default rules for deployment.

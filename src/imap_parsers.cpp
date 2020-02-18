@@ -1,6 +1,6 @@
 #include "imap_parsers.h"
 #include <QRegularExpression>
-QString parseLiteral(const QChar** pptr)
+QString parseLiteral(const QChar* pptr[])
 {
     //Parsowanie dosłownego stringa wg sekcji 4.3 dokumentacji IMAPv4
     auto ptr = *pptr;
@@ -16,6 +16,7 @@ QString parseLiteral(const QChar** pptr)
             break;
         case '0' ... '9':
             buff+=*ptr;
+            ptr++;
             break;
         case '}':
             num = buff.toInt();
@@ -155,4 +156,127 @@ QString imap::getFromList(const QStringList &list,const QString& name)
     //wg specyfikacji
     //wartość pola następuje bezpośrednio po nazwie pola
     return list.at( list.indexOf(name) + 1 );
+}
+/*newstuff*/
+namespace
+{
+    enum Chars
+    {
+        number,
+        open_par,
+        close_par,
+        open_curl,
+        close_curl,
+        cr,
+        lf,
+        quote,
+        space,
+        other,
+
+    };
+    Chars classify(char c)
+    {
+        switch(c)
+        {
+        case '0' ... '9':return number;
+        case '(':return open_par;
+        case ')':return close_par;
+        case '{':return open_curl;
+        case '}':return close_curl;
+        case '\r':return cr;
+        case '\n':return lf;
+        case '\"':return quote;
+        case ' ':return space;
+        default:return other;
+        }
+    }
+}
+
+void imap::Assembler::feed(const QByteArray &arr)
+{
+    const char* data = arr.data();
+    auto literalSize = [&](int& i)->int{
+            int num=0;
+            QString buff;
+            while(num==0)
+            {
+                //Odczytanie liczby oktetów stringa
+                switch (data[i])
+                {
+                case '{':
+                    break;
+                case '0' ... '9':
+                    buff+=data[i];
+                    break;
+                case '}':
+                    num = buff.toInt();
+                    break;
+                }
+                i++;
+            }
+            i+=2;
+            //if(i>arr.size()) oops;
+            return num;
+    };
+
+    for(int i=0;i<arr.size();i++)
+    {
+        if(state.literal)
+        {
+            state.literalSize--;
+            if(state.literalSize == 0)
+            {
+                state.literal = false;
+            }
+        }
+
+        switch(data[i])
+        {
+        case '(':
+            state.paren_count++;
+            buffer+=data[i];
+            break;
+        case ')':
+            state.paren_count--;
+            buffer+=data[i];
+            break;
+        case '\"':
+            state.quotes = !state.quotes;
+            buffer+=data[i];
+            break;
+        case '{':
+            state.literalSize=literalSize(i);
+            state.literal = true;
+            break;
+        case '\n':
+            buffer+=data[i];
+            if(isStateOk())
+            {
+                outputLines.push_back(buffer);
+                buffer.clear();
+            }
+            break;
+        default:
+            buffer+=data[i];
+            break;
+        }
+    }
+
+
+}
+
+void imap::Assembler::reset()
+{
+    state = {};
+    outputLines.clear();
+}
+
+bool imap::Assembler::isFinished()
+{
+    return isTagged(outputLines.back().data());
+}
+
+bool imap::Assembler::isStateOk()
+{
+    return (!state.literal && !state.quotes && state.paren_count==0);
 }

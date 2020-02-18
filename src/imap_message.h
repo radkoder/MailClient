@@ -3,8 +3,12 @@
 
 #include <QString>
 #include <QVector>
+#include <QMetaType>
 #include <string_view>
+#include <memory>
+#include <future>
 namespace imap{
+    class MailBox;
     enum Command
     {
         login,
@@ -14,7 +18,8 @@ namespace imap{
         bad,
         fetch,
         select,
-        unselect
+        unselect,
+        uid_fetch
     };
     constexpr const std::string_view imapCmds[] = {
         [login] = "LOGIN",
@@ -23,30 +28,67 @@ namespace imap{
         [ok] = "OK",
         [bad] = "BAD",
         [fetch] = "FETCH",
-        [select] = "SELECT"
+        [select] = "SELECT",
+        [unselect] = "UNSELECT",
+        [uid_fetch] = "UID FETCH"
 
     };
+    enum DataType
+    {
+        string,
+        nil,
+        list,
+        number,
+        line,
+        deduce
+    };
+    enum class Context
+    {
+        none,
+        fetch_envelope,
+        fetch_body
+    };
+
+    class DataPart
+    {
+        std::vector<DataType> types;
+        std::vector<std::string> children;
+    public:
+        DataPart(DataType type, const QString& str=QString());
+        void add(const DataPart& str);
+    };
+
     class Message
     {
+        QStringList lines;
     public:
         Message()=default;
-        Message(const QString& rawMsg);
-        bool isCorrect() const;
-        bool isTagged() const;
-        bool isOk() const;
-
-        QString tag;
-        QString cmd;
-        QString args;
+        Message(QStringList rawMsg);
+        const QStringList& Lines() const;
     };
     class ResponsePack
     {
         Command response_to;
         QStringList lines;
     };
+
+    struct Request
+    {
+        //wymagane żeby ten obiekt mógł być przesyłany w sygnale
+        Request()=default;
+        Request(const Request& other)=default;
+        ~Request()=default;
+
+        QByteArray data;
+        std::shared_ptr<std::promise<Message>> promise; //UGH TODO nie wiem jak ale trzeba to zmienić
+        int futureIndex;
+    };
+
+
+
     static uint16_t tagCount=0;
     template<typename... T>
-    QByteArray makeRequest(Command type,T ...args)
+    QByteArray makeReqStr(Command type,T ...args)
     {
         //tags will be hex numbers from 0000 to FFFF
 
@@ -58,5 +100,8 @@ namespace imap{
         (s << ... <<args);
         return s.join(' ').toUtf8().trimmed()+"\r\n"; //tag command [args...]\r\n
     }
+
+
 }
+Q_DECLARE_METATYPE(imap::Request);
 #endif // IMAPCOMMAND_H

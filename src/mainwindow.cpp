@@ -2,6 +2,7 @@
 #include "ui_mainwindow.h"
 #include "debugconsole.h"
 #include "logindialog.h"
+#include "ui_mailbodyview.h"
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -13,17 +14,27 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&mailBox,&imap::MailBox::error,dconsole,&DebugConsole::writeUrgent);
     connect(ui->nextButton,&QPushButton::clicked,[this](bool c){
         pageNum++;
-        mailBox.fetchInfo(10,10*pageNum);
-        mailBox.onFetchReady([this]()
-        {
-           mailModel.setMails(mailBox.getLatest(10,10*pageNum));
+        //OMG JUST LIKE RUST XDD
+        auto res = mailBox.fetchInfo(10,10*pageNum)
+                .onReady([this](auto msg){
+                mailModel.setMails(mailBox.getLatest(10,10*pageNum));
         });
-
     });
     connect(ui->prevButton,&QPushButton::clicked,[this](bool c){
         pageNum--;
         if(pageNum<0)pageNum=0;
         mailModel.setMails(mailBox.getLatest(10,10*pageNum));
+    });
+    connect(ui->mailListView,&QTableView::doubleClicked,[this](const QModelIndex& index){
+        auto uid = index.data(Qt::UserRole);
+        mailBox.fetchBody(uid.toString()).onReady([&,this](auto msg)
+        {
+            auto* mailview = new QWidget(this);
+            Ui_Form mui;
+            mui.bodyText->setHtml("<b>B</b>igga");
+            mui.setupUi(mailview);
+            mailview->show();
+        });
     });
     //get credentials
     LoginDialog ldiag;
@@ -32,7 +43,10 @@ MainWindow::MainWindow(QWidget *parent)
         mailBox.open(ldiag.loginData.server);
         mailBox.login(ldiag.loginData.mail,ldiag.loginData.pass);
         mailBox.select("INBOX");
-        mailBox.fetchInfo(20);
+        mailBox.fetchInfo(20).onReady([this](auto msg)
+        {
+           mailModel.setMails(mailBox.getLatest(10));
+        });
     }else
     {
         dconsole->write("nie zalogowany");
@@ -40,11 +54,6 @@ MainWindow::MainWindow(QWidget *parent)
     dconsole->show();
     ui->mailListView->setModel(&mailModel);
     ui->mailListView->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    mailBox.onFetchReady([this]()
-    {
-       mailModel.setMails(mailBox.getLatest(10));
-    });
-
 }
 
 MainWindow::~MainWindow()

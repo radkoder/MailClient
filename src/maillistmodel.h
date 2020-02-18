@@ -20,7 +20,6 @@ public:
 
     void setMails(const QVector<imap::MailEntry>& mails);
 
-
 private:
     QVector<imap::MailEntry> mailList;
 };
