@@ -111,7 +111,7 @@ void imap::Connection::send(Request r)
 }
 void imap::Connection::sendNext()
 {
-    if(!msgBuffer.empty() && !reqInProgress)
+    if(!requestQueue.empty() && !reqInProgress)
     {
         emit log("[[imap::Connection]]: Sending \""+requestQueue.front().data+"\"");
         sock.write(requestQueue.front().data);
