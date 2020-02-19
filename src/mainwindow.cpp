@@ -31,8 +31,8 @@ MainWindow::MainWindow(QWidget *parent)
         {
             auto* mailview = new QWidget(this);
             Ui_Form mui;
-            mui.bodyText->setHtml("<b>B</b>igga");
             mui.setupUi(mailview);
+            mui.bodyText->setHtml("<b>B</b>igga");
             mailview->show();
         });
     });

@@ -49,15 +49,6 @@ namespace imap{
         fetch_body
     };
 
-    class DataPart
-    {
-        std::vector<DataType> types;
-        std::vector<std::string> children;
-    public:
-        DataPart(DataType type, const QString& str=QString());
-        void add(const DataPart& str);
-    };
-
     class Message
     {
         QStringList lines;
@@ -65,11 +56,6 @@ namespace imap{
         Message()=default;
         Message(QStringList rawMsg);
         const QStringList& Lines() const;
-    };
-    class ResponsePack
-    {
-        Command response_to;
-        QStringList lines;
     };
 
     struct Request
@@ -83,8 +69,6 @@ namespace imap{
         std::shared_ptr<std::promise<Message>> promise; //UGH TODO nie wiem jak ale trzeba to zmienić
         int futureIndex;
     };
-
-
 
     static uint16_t tagCount=0;
     template<typename... T>

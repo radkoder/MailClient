@@ -157,41 +157,6 @@ QString imap::getFromList(const QStringList &list,const QString& name)
     //wartość pola następuje bezpośrednio po nazwie pola
     return list.at( list.indexOf(name) + 1 );
 }
-/*newstuff*/
-namespace
-{
-    enum Chars
-    {
-        number,
-        open_par,
-        close_par,
-        open_curl,
-        close_curl,
-        cr,
-        lf,
-        quote,
-        space,
-        other,
-
-    };
-    Chars classify(char c)
-    {
-        switch(c)
-        {
-        case '0' ... '9':return number;
-        case '(':return open_par;
-        case ')':return close_par;
-        case '{':return open_curl;
-        case '}':return close_curl;
-        case '\r':return cr;
-        case '\n':return lf;
-        case '\"':return quote;
-        case ' ':return space;
-        default:return other;
-        }
-    }
-}
-
 void imap::Assembler::feed(const QByteArray &arr)
 {
     const char* data = arr.data();

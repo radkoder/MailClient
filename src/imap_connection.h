@@ -25,8 +25,8 @@ namespace imap {
         bool reqInProgress=false;
     public:
         explicit Connection(QObject *parent = nullptr);
-        Connection(QString hostname, QObject *parent = nullptr);
-        void open(QString hostname);
+        Connection(const QString& hostname, QObject *parent = nullptr);
+        void open(const QString& hostname);
         void close();
         void send(Request r);
         ~Connection();

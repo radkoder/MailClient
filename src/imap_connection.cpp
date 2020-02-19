@@ -1,4 +1,5 @@
 #include "imap_connection.h"
+#include <utility>
 #include "imap_message.h"
 #include "imap_parsers.h"
 imap::Connection::Connection(QObject *parent) : QObject(parent)
@@ -13,13 +14,13 @@ imap::Connection::Connection(QObject *parent) : QObject(parent)
     });
 
 }
-imap::Connection::Connection(QString hostname, QObject *parent)
+imap::Connection::Connection(const QString& hostname, QObject *parent)
     :Connection(parent)
 {
     open(hostname);
 }
 
-void imap::Connection::open(QString hostname)
+void imap::Connection::open(const QString& hostname)
 {
     emit log("[[Connection]]:opening connection to"+hostname);
     sock.connectToHostEncrypted(hostname,SIMAPport);
@@ -65,42 +66,6 @@ void imap::Connection::gotData()
     {
         emit log("[[imap::Connection]]: Waiting for more data...");
     }
-
-
-
-
-
-    /* Chyba już nie potrzebne ale trzamam dla referencji jakby coś nie działało
-     *
-    auto responsePart = sock.readAll();
-    emit log("S:"+responsePart);
-    responseBuffer += responsePart;
-    bool isTagged=false;
-    //odpowiedz otagowana zazwyczaj jest ostatnia
-    if(responsePart.endsWith('\n'))
-    {
-        auto ress = responsePart.split('\n');
-        ress.removeLast(); //po .split zostaje jedna pusta część na końcu
-        isTagged = imap::isTagged(ress.last());
-    }
-
-
-    if(isTagged)
-    {
-        //emit log("Sending response to Mailbox");
-        auto bytelist = responseBuffer.split('\n');
-        QStringList strlist;
-        strlist.reserve(bytelist.size());
-        for(auto& ba : bytelist)
-        {
-            strlist.push_back(QString::fromUtf8(ba));
-        }
-        responseBuffer.clear();
-        emit responseReady(strlist);
-        sendNext();
-    }*/
-
-
 }
 
 void imap::Connection::send(Request r)

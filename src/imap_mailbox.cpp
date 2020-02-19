@@ -19,7 +19,7 @@ imap::MailBox::MailBox(QObject *parent) : QObject(parent)
     netThread.start();
 }
 
-void imap::MailBox::open(QString hostname)
+void imap::MailBox::open(const QString& hostname)
 {
     emit log("[[Mailbox]]:open request");
     emit openConn(hostname);
@@ -163,7 +163,7 @@ imap::Message imap::MailBox::get(int index)
     }
 }
 
-void imap::MailBox::putCallback(int index, std::function<void (Message)> func)
+void imap::MailBox::putCallback(int index, const std::function<void (Message)>& func)
 {
     callbacks.insert(index,func); //zastępujemy jeśli już było
 }
@@ -264,7 +264,7 @@ void imap::MailBox::getResponse(int index)
 
 }
 
-void imap::MailBox::addMail(imap::MailEntry newEntry)
+void imap::MailBox::addMail(const imap::MailEntry& newEntry)
 {
     auto uid = newEntry.uid.toInt();
     if(!uids.contains(uid))

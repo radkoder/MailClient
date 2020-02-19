@@ -34,7 +34,7 @@ namespace imap
         Q_OBJECT
     public:
         explicit MailBox(QObject *parent = nullptr);
-        void open(QString hostname);
+        void open(const QString& hostname);
         ResponseHandle login(QString username, QString password);
         ResponseHandle send(Command arglessCmd);
         ResponseHandle select(QString folderName);
@@ -44,21 +44,21 @@ namespace imap
         QString getBody(QString uid);
 
         Message get(int index);
-        void putCallback(int index,std::function<void(Message)> func);
+        void putCallback(int index, const std::function<(Message)> &func);
         template<typename Func>
         void onFetchReady(Func f);
         ~MailBox();
     signals:
         void log(QString);
         void error(QString);
-        void loggedIn(Account);
+        void loggedIn(imap::Account);
         void syntaxError();
         void fetchReady();
-        void sendRequest(Request);
+        void sendRequest(imap::Request);
         void openConn(QString hostname);
     private:
         void getResponse(int index);
-        void addMail(MailEntry newEntry);
+        void addMail(const MailEntry &newEntry);
         Connection* conn;
 
         QList<Context> contextQueue;

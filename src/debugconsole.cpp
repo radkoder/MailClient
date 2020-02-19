@@ -1,6 +1,7 @@
 #include "debugconsole.h"
 #include "ui_debugconsole.h"
 #include <QScrollBar>
+#include <utility>
 DebugConsole::DebugConsole(QWidget *parent) :
     QDialog(parent),
     ui(new Ui::DebugConsole)
@@ -24,6 +25,6 @@ void DebugConsole::write(QString line)
 void DebugConsole::writeUrgent(QString line)
 {
     write("<span color=red>");
-    write(line);
+    write(std::move(line));
     write("</span>");
 }
