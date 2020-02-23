@@ -13,12 +13,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(&mailBox,&imap::MailBox::log,dconsole,&DebugConsole::write);
     connect(&mailBox,&imap::MailBox::error,dconsole,&DebugConsole::writeUrgent);
     connect(ui->nextButton,&QPushButton::clicked,[this](bool c){
-        pageNum++;
         //OMG JUST LIKE RUST XDD
+        pageNum++;
         auto res = mailBox.fetchInfo(10,10*pageNum)
-                .onReady([this](auto msg){
-                mailModel.setMails(mailBox.getLatest(10,10*pageNum));
+                .onReady([this,p=pageNum](auto msg){
+                mailModel.setMails(mailBox.getLatest(10,10*p));
         });
+
     });
     connect(ui->prevButton,&QPushButton::clicked,[this](bool c){
         pageNum--;
