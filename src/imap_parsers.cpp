@@ -238,7 +238,10 @@ void imap::Assembler::reset()
 
 bool imap::Assembler::isFinished()
 {
-    return isTagged(outputLines.back().data());
+    if(outputLines.empty())
+        return false;
+    else
+        return isTagged(outputLines.back().data());
 }
 
 bool imap::Assembler::isStateOk()
