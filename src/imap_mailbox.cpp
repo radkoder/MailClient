@@ -28,115 +28,64 @@ void imap::MailBox::open(const QString& hostname)
 
 imap::ResponseHandle imap::MailBox::login(QString username, QString password)
 {
-    logged_in.login = username;
-    Request req;
-    req.promise = std::make_shared<std::promise<Message>>();
-    futures.emplace(keycount++,ResponseEntry{Command::login,Context::none,req.promise->get_future()});
-
-    int index = keycount-1;
+    auto req = newRequest(Command::login);
     req.data = makeReqStr(Command::login,username,password);
-    req.futureIndex = index;
-    emit log("[[Mailbox]]:sending login request");
+    emit log(QString{"[[Mailbox]]:sending LOGIN request"});
     emit sendRequest(req);
-    return ResponseHandle{index,this};
+    return ResponseHandle{req.futureIndex,this};
 }
 
 imap::ResponseHandle imap::MailBox::send(imap::Command arglessCmd)
 {
-    /*noop capability logout*/
-    Request req;
-    req.promise = std::make_shared<std::promise<Message>>();
-    futures.emplace(keycount++,ResponseEntry{arglessCmd,Context::none,req.promise->get_future()});
-    int index = keycount-1;
+    auto req = newRequest(arglessCmd);
     req.data = makeReqStr(arglessCmd);
-    req.futureIndex = index;
-    emit log("[[Mailbox]]:sending command");
+    emit log(QString{"[[Mailbox]]:sending %1 request"}.arg(imapCmds[arglessCmd].data()));
     emit sendRequest(req);
-    return ResponseHandle{index,this};
+    return ResponseHandle{req.futureIndex,this};
 }
 
 imap::ResponseHandle imap::MailBox::select(QString folderName)
 {
-    //musimy sprawidzić czy stan jest bezpieczny,
-    //inaczej zajdzie hazard w stylu -
-    //będziemy chccieli sfetchować maila z folderu zanim dojdzie do nas odpowiedz na selecta
-    //wszystkie niebezpieczne requesty stoją w kolejce aż będzie bezpiecznie
-    //stan niebezpieczny powstaje tylko po zapytaniach select... narazie
-
-    Request req;
-    req.promise = std::make_shared<std::promise<Message>>();
-    futures.emplace(keycount++,ResponseEntry{Command::select,Context::none,req.promise->get_future()});
-    int index = keycount-1;
-    req.data = makeReqStr(Command::select,folderName);
-    req.futureIndex = index;
-    if(!safeState)
+    auto req = newRequest(Command::select);
+    putSafeRequest([req,folderName,this]()mutable
     {
-        emit log("[[Mailbox]]:deferring select request");
-        callQueue.push_back([this,req](){
-           this->emit log("[[Mailbox]]:resuming select request");
-           this->emit sendRequest(req); //pojebane wiem xd
-           safeState = false;
-        });
-
-    }
-    else
-    {
-        emit log("[[Mailbox]]:sending select request");
-        emit sendRequest(req);
+        req.data=makeReqStr(Command::select,folderName);
+        this->emit log(QString{"[[Mailbox]]:sending SELECT request"});
+        this->emit sendRequest(req);
         safeState = false;
-    }
-    return ResponseHandle{index,this};
-
+    });
+    return ResponseHandle{req.futureIndex,this};
 }
 
 imap::ResponseHandle imap::MailBox::fetchInfo(int num, int skip)
 {
-    Request req;
-    req.promise = std::make_shared<std::promise<Message>>();
-    futures.emplace(keycount++,ResponseEntry{Command::fetch,Context::fetch_envelope,req.promise->get_future()});
-    int index = keycount-1;
-    req.futureIndex = index;
+    auto req = newRequest(Command::fetch,Context::fetch_envelope);
+    putSafeRequest([num,skip,req,this]()mutable{
 
-    if(!safeState)
-    {
-        emit log("[[Mailbox]]:defering fetch request");
-        callQueue.push_back([num,skip,req,this]()mutable{
-
-            auto start = QString::number(mailNum - skip);
-            auto end = QString::number(mailNum - skip - num);
-            auto range = start+':'+end;
-            req.data=makeReqStr(Command::fetch,range,"(ENVELOPE","UID)");
-            emit log("[[Mailbox]]:resuming fetch request");
-            this->emit sendRequest(req);
-        });
-    }
-    else
-    {
         auto start = QString::number(mailNum - skip);
         auto end = QString::number(mailNum - skip - num);
         auto range = start+':'+end;
         req.data=makeReqStr(Command::fetch,range,"(ENVELOPE","UID)");
-        emit log("[[Mailbox]]:sending fetch request");
+        emit log("[[Mailbox]]:sending FETCH request");
         this->emit sendRequest(req);
-    }
-    return ResponseHandle{index,this};
+    });
+    return ResponseHandle{req.futureIndex,this};
+
 }
 
 imap::ResponseHandle imap::MailBox::fetchBody(QString uid)
 {
 
-    Request req;
-    req.promise = std::make_shared<std::promise<Message>>();
-    futures.emplace(keycount++,ResponseEntry{Command::uid_fetch,Context::fetch_body,req.promise->get_future()});
-    int index = keycount-1;
+    auto req = newRequest(Command::uid_fetch);
     req.data = makeReqStr(Command::uid_fetch,uid,"BODY[1]");
-    req.futureIndex = index;
+    emit log(QString{"[[Mailbox]]:sending UID FETCH request"});
     emit sendRequest(req);
-    return ResponseHandle{index,this};
+    return ResponseHandle{req.futureIndex,this};
 }
 
 QVector<imap::MailEntry> imap::MailBox::getLatest(int num,int skip)
 {
+    emit log(QString{"[[MailBox]]: Trying to get %1 mails starting from %2"}.arg(num).arg(skip));
     std::partial_sort(mails.begin(),mails.begin()+num+skip,mails.end(),[](auto a,auto b){
         return a.details.date() > b.details.date();
     });
@@ -273,6 +222,16 @@ void imap::MailBox::addMail(const imap::MailEntry& newEntry)
         mails.push_back(newEntry);
     }
 
+}
+
+imap::Request imap::MailBox::newRequest(imap::Command cmd, Context ctx)
+{
+    Request req;
+    req.promise = std::make_shared<std::promise<Message>>();
+    futures.emplace(keycount,ResponseEntry{cmd,ctx,req.promise->get_future()});
+    req.futureIndex = keycount;
+    keycount++;
+    return req;
 }
 
 imap::ResponseHandle &imap::ResponseHandle::onReady(std::function<void (Message)> func)

@@ -35,16 +35,20 @@ namespace imap
     public:
         explicit MailBox(QObject *parent = nullptr);
         void open(const QString& hostname);
+
+        //operacje możliwe do wykonywania na skrzynce pocztowej
         ResponseHandle login(QString username, QString password);
         ResponseHandle send(Command arglessCmd);
         ResponseHandle select(QString folderName);
         ResponseHandle fetchInfo(int num,int skip = 0);
         ResponseHandle fetchBody(QString uid);
+
+        //operacje możliwe do wykonania na zapisanym lokalnym stanie skrzynki
         QVector<MailEntry> getLatest(int num,int skip=0);
         QString getBody(QString uid);
 
         Message get(int index);
-        void putCallback(int index, const std::function<(Message)> &func);
+        void putCallback(int index, const std::function<void(Message)> &func);
         template<typename Func>
         void onFetchReady(Func f);
         ~MailBox();
@@ -57,17 +61,18 @@ namespace imap
         void sendRequest(imap::Request);
         void openConn(QString hostname);
     private:
-        void getResponse(int index);
-        void addMail(const MailEntry &newEntry);
+        void getResponse(int index); //odbiera informacje z połączenia z future o danym indeksie
+        void addMail(const MailEntry &newEntry); //dodaje informacje o mailu do lokalnego bufora
+        Request newRequest(Command cmd,Context ctx = Context::none); //zwraca poprawny Request i trzeba tylko ustawić pole .data
+        template<typename Func>
+        void putSafeRequest(Func f); //dodaje zapytanie ze sprawdzeniem stanu
         Connection* conn;
 
         QList<Context> contextQueue;
-        QList<std::function<void(void)>> callQueue; //this kills the cpplet xd
-
+        QList<std::function<void()>> callQueue; //this kills the cpplet xd
         bool safeState=true;
         int mailNum;
         Account logged_in;
-
         QVector<MailEntry> mails;
         QMap<int,QString> mailBodies;
         QSet<int> uids;
@@ -81,20 +86,20 @@ namespace imap
         int keycount=0;
 
     };
-
     template<typename Func>
-    void MailBox::onFetchReady(Func f)
+    void MailBox::putSafeRequest(Func f)
     {
-        /*TODO*/
-        //trzeba będzie zastąpić kolejką wywołań
-        //bo buguje się kiedy jest więcej niż 1 f()
-        QMetaObject::Connection * const connection = new QMetaObject::Connection;
-        *connection = connect(this, &MailBox::fetchReady, [this, f, connection](){
+        if(!safeState)
+        {
+            emit log(QString{"[[Mailbox]]:defering [] request"});
+            callQueue.push_back(f);
+        }
+        else
+        {
             f();
-            QObject::disconnect(*connection);
-            delete connection;
-        });
+        }
     }
+
 }
 
 #endif // MAILSTATE_H
