@@ -2,7 +2,7 @@
 #include <utility>
 #include "imap_message.h"
 #include "imap_parsers.h"
-imap::Connection::Connection(QObject *parent) : QObject(parent)
+imap::Connection::Connection(QObject *parent) : QObject(parent),sock(this)
 {
     connect(&sock,&QSslSocket::readyRead,this,&Connection::gotData);
     connect(&sock, QOverload<const QList<QSslError> &>::of(&QSslSocket::sslErrors),
@@ -25,6 +25,10 @@ void imap::Connection::open(const QString& hostname)
     emit log("[[Connection]]:opening connection to"+hostname);
     sock.connectToHostEncrypted(hostname,SIMAPport);
     sock.waitForReadyRead(3000);
+    if(sock.state() != QAbstractSocket::ConnectedState)
+    {
+        emit error("[[Connection]]: nie udalo sie polaczyc");
+    }
 }
 
 void imap::Connection::close()
@@ -70,7 +74,7 @@ void imap::Connection::gotData()
 
 void imap::Connection::send(Request r)
 {
-    emit log("[[imap::Connection]]: Accepted send request "+r.data);
+    emit log("[[imap::Connection]]: Accepted send request ");
     requestQueue.push_back(std::move(r));
     if(!reqInProgress)sendNext();
 }
@@ -78,7 +82,7 @@ void imap::Connection::sendNext()
 {
     if(!requestQueue.empty() && !reqInProgress)
     {
-        emit log("[[imap::Connection]]: Sending \""+requestQueue.front().data+"\"");
+        emit log("[[imap::Connection]]: Sending request");
         sock.write(requestQueue.front().data);
         reqInProgress=true;
     }
